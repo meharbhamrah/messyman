@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
+import { MapPin, Loader2 } from 'lucide-react'
 
 export default function CreateMemoryPage() {
   const [text, setText] = useState('')
@@ -12,6 +13,8 @@ export default function CreateMemoryPage() {
   const [photo, setPhoto] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [location, setLocation] = useState('')
+  const [isGettingLocation, setIsGettingLocation] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
@@ -33,6 +36,53 @@ export default function CreateMemoryPage() {
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
+  }
+
+  const getLocation = () => {
+    if (!navigator.geolocation) {
+      setError('Geolocation is not supported by your browser')
+      return
+    }
+
+    setIsGettingLocation(true)
+    setError(null)
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords
+        
+        // Reverse geocode to get location name
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+          )
+          const data = await response.json()
+          
+          if (data && data.display_name) {
+            // Get just the city/town name
+            const parts = data.display_name.split(',')
+            const cityName = parts[0] + ', ' + parts[1]?.trim()
+            setLocation(cityName || data.display_name)
+          } else {
+            setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
+          }
+        } catch (err) {
+          setLocation(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`)
+        } finally {
+          setIsGettingLocation(false)
+        }
+      },
+      (err) => {
+        console.error('Error getting location:', err)
+        setError('Unable to get location. Please check your permissions.')
+        setIsGettingLocation(false)
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    )
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -73,14 +123,15 @@ export default function CreateMemoryPage() {
         setIsUploading(false)
       }
 
-      // Insert the memory
+      // Insert the memory with location
       const { data, error } = await supabase
         .from('memories')
         .insert({
           user_id: user.id,
           text: text.trim(),
           mood: 'reflective',
-          photo_url: photoUrl // Add photo URL to the memory
+          photo_url: photoUrl,
+          location: location.trim() || null // Add location
         })
         .select()
 
@@ -166,6 +217,41 @@ export default function CreateMemoryPage() {
                     className="object-cover rounded-lg"
                   />
                 </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Location
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Where did this happen?"
+                  className="flex-1 p-3 rounded-lg border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+                <button
+                  type="button"
+                  onClick={getLocation}
+                  disabled={isGettingLocation}
+                  className="px-4 py-2 border border-border rounded-lg hover:bg-secondary/50 transition-colors flex items-center gap-2"
+                >
+                  {isGettingLocation ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <MapPin className="w-4 h-4" />
+                  )}
+                  <span className="text-sm">
+                    {isGettingLocation ? 'Getting...' : 'Detect'}
+                  </span>
+                </button>
+              </div>
+              {location && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Location: {location}
+                </p>
               )}
             </div>
 
