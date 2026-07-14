@@ -5,113 +5,65 @@
 
 /* ============================================
    MESSYMAN DESIGN SYSTEM
-   Light, warm, and reflective. 
-   Like a cozy room for your memories.
+   Ocean Teal Theme - Reflective, calm, deep
+   Like looking into still water.
    ============================================ */
 
-@theme {
-  /* Fonts */
+@theme inline {
   --font-sans: var(--font-geist-sans, system-ui, -apple-system, sans-serif);
   --font-mono: var(--font-geist-mono, ui-monospace, monospace);
-
-  /* Radius */
-  --radius: 0.75rem;
-  --radius-sm: 0.5rem;
-  --radius-md: 0.625rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
 }
 
-/* 
-   SHADCN/UI COLOR TOKENS
-   Light, warm theme
-*/
 :root {
-  /* Light, warm background */
-  --background: oklch(0.97 0.01 85);
-  --foreground: oklch(0.15 0.01 85);
+  /* Background - soft warm white with a hint of cool */
+  --background: oklch(0.96 0.01 210);
+  --foreground: oklch(0.12 0.02 210);
 
-  /* Cards — warm white with subtle warmth */
-  --card: oklch(0.99 0.005 85);
-  --card-foreground: oklch(0.15 0.01 85);
+  /* Cards - clean white */
+  --card: oklch(0.99 0.005 210);
+  --card-foreground: oklch(0.12 0.02 210);
 
-  /* Popovers — match cards */
-  --popover: oklch(0.99 0.005 85);
-  --popover-foreground: oklch(0.15 0.01 85);
+  --popover: oklch(0.99 0.005 210);
+  --popover-foreground: oklch(0.12 0.02 210);
 
-  /* Primary — warm amber/gold. Like honey. */
-  --primary: oklch(0.72 0.18 70);
-  --primary-foreground: oklch(0.98 0.005 85);
+  /* Primary - Ocean Teal */
+  --primary: oklch(0.52 0.14 210);
+  --primary-foreground: oklch(0.98 0.005 210);
 
-  /* Secondary — soft warm grey */
-  --secondary: oklch(0.92 0.01 85);
-  --secondary-foreground: oklch(0.15 0.01 85);
+  /* Secondary - Soft cool grey */
+  --secondary: oklch(0.92 0.01 210);
+  --secondary-foreground: oklch(0.12 0.02 210);
 
-  /* Muted — for less important text */
-  --muted: oklch(0.94 0.01 85);
-  --muted-foreground: oklch(0.45 0.01 85);
+  /* Muted - for less important text */
+  --muted: oklch(0.94 0.01 210);
+  --muted-foreground: oklch(0.45 0.02 210);
 
-  /* Accent — warm for hover states */
-  --accent: oklch(0.88 0.03 75);
-  --accent-foreground: oklch(0.15 0.01 85);
+  /* Accent - slightly darker teal for hover */
+  --accent: oklch(0.85 0.03 210);
+  --accent-foreground: oklch(0.12 0.02 210);
 
-  /* Destructive — soft red */
+  /* Destructive - soft red */
   --destructive: oklch(0.48 0.18 15);
-  --destructive-foreground: oklch(0.98 0.005 85);
+  --destructive-foreground: oklch(0.98 0.005 210);
 
-  /* Borders — soft warm */
-  --border: oklch(0.88 0.02 80);
-  --input: oklch(0.88 0.02 80);
+  /* Borders - soft cool */
+  --border: oklch(0.85 0.02 210);
+  --input: oklch(0.85 0.02 210);
 
-  /* Ring — warm glow on focus */
-  --ring: oklch(0.65 0.18 70);
+  /* Ring - teal glow on focus */
+  --ring: oklch(0.48 0.14 210);
 
-  /* Charts — warm palette */
-  --chart-1: oklch(0.72 0.18 70);
-  --chart-2: oklch(0.60 0.15 60);
-  --chart-3: oklch(0.50 0.12 50);
-  --chart-4: oklch(0.40 0.08 40);
-  --chart-5: oklch(0.30 0.05 30);
-
-  /* Sidebar */
-  --sidebar: oklch(0.95 0.01 85);
-  --sidebar-foreground: oklch(0.15 0.01 85);
-  --sidebar-primary: oklch(0.72 0.18 70);
-  --sidebar-primary-foreground: oklch(0.98 0.005 85);
-  --sidebar-accent: oklch(0.88 0.03 75);
-  --sidebar-accent-foreground: oklch(0.15 0.01 85);
-  --sidebar-border: oklch(0.88 0.02 80);
-  --sidebar-ring: oklch(0.65 0.18 70);
+  --radius: 0.75rem;
 }
 
-/* Dark mode override (if needed later) */
-.dark {
-  --background: oklch(0.13 0.005 90);
-  --foreground: oklch(0.95 0.005 90);
-  --card: oklch(0.17 0.005 90);
-  --card-foreground: oklch(0.95 0.005 90);
-  --popover: oklch(0.17 0.005 90);
-  --popover-foreground: oklch(0.95 0.005 90);
-  --primary: oklch(0.78 0.17 80);
-  --primary-foreground: oklch(0.13 0.01 90);
-  --secondary: oklch(0.22 0.005 90);
-  --secondary-foreground: oklch(0.95 0.005 90);
-  --muted: oklch(0.22 0.005 90);
-  --muted-foreground: oklch(0.55 0.01 90);
-  --accent: oklch(0.22 0.01 80);
-  --accent-foreground: oklch(0.95 0.005 90);
-  --border: oklch(0.25 0.005 90);
-  --input: oklch(0.25 0.005 90);
-  --ring: oklch(0.70 0.15 80);
+* {
+  border-color: var(--border);
 }
 
-/* Base styles - removed @apply that were causing issues */
 html {
   font-family: var(--font-sans);
   background-color: var(--background);
   color: var(--foreground);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
@@ -121,28 +73,16 @@ body {
   color: var(--foreground);
 }
 
-/* Messyman custom styles */
 .glass {
-  background-color: var(--card);
-  background-color: rgba(255, 255, 255, 0.6);
+  background-color: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(12px);
   border: 1px solid var(--border);
 }
 
-.text-warm {
-  background: linear-gradient(to right, #f59e0b, #eab308, #d97706);
+/* Teal gradient for brand text */
+.text-brand {
+  background: linear-gradient(to right, #0d9488, #0f766e, #115e59);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-}
-
-/* Override any border styles */
-* {
-  border-color: var(--border);
-}
-
-/* Focus ring */
-*:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
 }
