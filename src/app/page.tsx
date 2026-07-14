@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 
 export default async function Home() {
   const supabase = await createClient()
@@ -20,13 +21,19 @@ export default async function Home() {
           <p className="text-lg mt-3 text-muted-foreground">
             Welcome back, {user.email}
           </p>
-          <div className="mt-8 flex gap-4">
-            <button className="bg-primary text-primary-foreground px-6 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity">
+          <div className="mt-8 flex flex-wrap gap-4">
+            <Link 
+              href="/memory/new"
+              className="bg-primary text-primary-foreground px-6 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity inline-block"
+            >
               Create Memory
-            </button>
-            <button className="border border-border px-6 py-2 rounded-lg font-medium hover:bg-secondary/50 transition-colors">
+            </Link>
+            <Link
+              href="/timeline"
+              className="border border-border px-6 py-2 rounded-lg font-medium hover:bg-secondary/50 transition-colors inline-block"
+            >
               View Timeline
-            </button>
+            </Link>
           </div>
         </div>
 
