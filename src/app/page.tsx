@@ -1,4 +1,15 @@
-export default function Home() {
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+
+export default async function Home() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  // If user is not logged in, redirect to login
+  if (!user) {
+    redirect('/login')
+  }
+
   return (
     <main className="min-h-screen p-8">
       <div className="max-w-3xl mx-auto">
@@ -7,14 +18,14 @@ export default function Home() {
             <span className="text-brand">Messyman</span>
           </h1>
           <p className="text-lg mt-3 text-muted-foreground">
-            Your memories, investigated.
+            Welcome back, {user.email}
           </p>
           <div className="mt-8 flex gap-4">
             <button className="bg-primary text-primary-foreground px-6 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity">
-              Get Started
+              Create Memory
             </button>
             <button className="border border-border px-6 py-2 rounded-lg font-medium hover:bg-secondary/50 transition-colors">
-              Learn More
+              View Timeline
             </button>
           </div>
         </div>
@@ -39,7 +50,18 @@ export default function Home() {
             </p>
           </div>
         </div>
+
+        <div className="mt-8 text-center">
+          <form action="/auth/signout" method="post">
+            <button 
+              type="submit"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
       </div>
     </main>
-  );
+  )
 }
