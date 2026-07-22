@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  assetPrefix: process.env.NEXT_PUBLIC_APP_URL || '',
+  // Only set assetPrefix if we're on a custom domain (not Vercel production)
+  assetPrefix: process.env.NEXT_PUBLIC_ASSET_PREFIX || '',
+  
   trailingSlash: false,
+  
   images: {
     remotePatterns: [
       {
@@ -28,9 +31,11 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  
   typescript: {
     ignoreBuildErrors: true,
   },
+  
   turbopack: {},
 };
 
