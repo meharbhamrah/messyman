@@ -40,13 +40,28 @@ export async function checkAndGenerateDailyContent(userId: string) {
       .order("created_at", { ascending: false })
       .limit(15);
     const history = memories?.map(m => m.text || m.ai_summary).filter(Boolean).join("\n") || "";
-    const { data: inv } = await supabase
+    
+    // FIX: Fetch investigation separately to avoid nested type issues
+    let question: string | undefined = undefined;
+    const { data: invData } = await supabase
       .from("user_investigations")
-      .select("investigation:investigations(question)")
+      .select("investigation_id")
       .eq("user_id", userId)
       .is("completed_at", null)
       .limit(1);
-    const question = inv?.[0]?.investigation?.question;
+    
+    if (invData && invData.length > 0) {
+      const invId = invData[0].investigation_id;
+      const { data: investigation } = await supabase
+        .from("investigations")
+        .select("question")
+        .eq("id", invId)
+        .single();
+      if (investigation) {
+        question = investigation.question as string;
+      }
+    }
+    
     const promptText = await generateJournalPrompt(history, question);
     if (promptText) {
       const { data: inserted, error } = await supabase
@@ -114,7 +129,6 @@ export async function checkAndGenerateDailyContent(userId: string) {
       top_emotions: Object.entries(emotionCounts).sort((a,b) => b[1]-a[1]).slice(0,5).map(([e]) => e),
       top_topics: Object.entries(topicCounts).sort((a,b) => b[1]-a[1]).slice(0,5).map(([t]) => t),
       top_people: Object.entries(personCounts).sort((a,b) => b[1]-a[1]).slice(0,5).map(([p]) => p),
-      // Add a random seed to vary results
       seed: getDailySeed(),
     };
     

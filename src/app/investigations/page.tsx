@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Compass, MapPin, Check, Award, ChevronRight, Lock, Play, Sparkles, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { Compass, MapPin, Check, Award, ChevronRight, Lock, Play, Sparkles, Plus, Trash2, AlertTriangle, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Header } from "@/components/ui/Header";
 import { Button } from "@/components/ui/Button";
+import { generateGuidedInvestigations } from "@/app/actions/generate-guided";
 
 interface Investigation {
   id: string;
@@ -32,12 +33,15 @@ export default function InvestigationsPage() {
   const router = useRouter();
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [active, setActive] = useState<UserInvestigation | null>(null);
   const [completed, setCompleted] = useState<UserInvestigation[]>([]);
   const [guidedAvailable, setGuidedAvailable] = useState<Investigation[]>([]);
   const [customAvailable, setCustomAvailable] = useState<Investigation[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>("");
+  const [allGuided, setAllGuided] = useState<Investigation[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -51,38 +55,90 @@ export default function InvestigationsPage() {
   }, []);
 
   const fetchData = async (userId: string) => {
-    const { data: guided } = await supabase
+    console.log("🔍 [FETCH] Starting fetchData for user:", userId);
+
+    // Fetch ALL guided investigations (generated + static) - use LET not CONST
+    let { data: allGuidedData, error: guidedError } = await supabase
       .from("investigations")
       .select("*")
       .eq("is_active", true)
       .eq("is_custom", false)
       .order("created_at");
+    
+    console.log("📊 [FETCH] All guided investigations:", allGuidedData?.length || 0);
+    if (guidedError) console.error("❌ [FETCH] Guided error:", guidedError);
+    setAllGuided(allGuidedData || []);
 
-    const { data: custom } = await supabase
+    // Fetch custom investigations
+    const { data: custom, error: customError } = await supabase
       .from("investigations")
       .select("*")
       .eq("is_active", true)
       .eq("is_custom", true)
       .eq("created_by_user", userId)
       .order("created_at", { ascending: false });
+    console.log("📊 [FETCH] Custom investigations:", custom?.length || 0);
+    if (customError) console.error("❌ [FETCH] Custom error:", customError);
 
-    const { data: userInv } = await supabase
-      .from("user_investigations")
-      .select(`
-        id,
-        investigation_id,
-        progress,
-        completed_at,
-        memories_since_start,
-        signals_collected,
-        investigation:investigations(*)
-      `)
-      .eq("user_id", userId)
-      .order("created_at");
+    // Fetch user investigations
+    let userInv: any = null;
+
+    try {
+      const { data, error } = await supabase
+        .from("user_investigations")
+        .select(`
+          id,
+          investigation_id,
+          progress,
+          completed_at,
+          memories_since_start,
+          signals_collected,
+          investigation:investigations(*)
+        `)
+        .eq("user_id", userId)
+        .order("started_at", { ascending: false });
+
+      console.log("📊 [FETCH] User investigations:", data?.length || 0);
+      
+      if (error) {
+        console.error("❌ [FETCH] UserInv error:", error);
+        if (error.code === "42703") {
+          console.warn("⚠️ [FETCH] 'started_at' column missing, trying order by 'id'...");
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from("user_investigations")
+            .select(`
+              id,
+              investigation_id,
+              progress,
+              completed_at,
+              memories_since_start,
+              signals_collected,
+              investigation:investigations(*)
+            `)
+            .eq("user_id", userId)
+            .order("id", { ascending: false });
+          
+          if (!fallbackError && fallbackData) {
+            userInv = fallbackData;
+            console.log("✅ [FETCH] Fallback succeeded:", userInv?.length || 0);
+          } else {
+            console.error("❌ [FETCH] Fallback also failed:", fallbackError);
+            userInv = data || [];
+          }
+        } else {
+          userInv = data || [];
+        }
+      } else {
+        userInv = data || [];
+      }
+    } catch (err) {
+      console.error("❌ [FETCH] Unexpected error:", err);
+      userInv = [];
+    }
 
     const completedWithRevelation = new Set();
-    if (userInv) {
-      const completedIds = userInv.filter(inv => inv.completed_at).map(inv => inv.investigation_id);
+    if (userInv && userInv.length > 0) {
+      const completedIds = userInv.filter((inv: any) => inv.completed_at).map((inv: any) => inv.investigation_id);
       if (completedIds.length > 0) {
         const { data: insights } = await supabase
           .from("insights")
@@ -90,7 +146,7 @@ export default function InvestigationsPage() {
           .eq("user_id", userId)
           .eq("type", "revelation");
         if (insights) {
-          insights.forEach(insight => {
+          insights.forEach((insight: any) => {
             const invId = insight.evidence?.investigation_id;
             if (invId) completedWithRevelation.add(invId);
           });
@@ -98,41 +154,166 @@ export default function InvestigationsPage() {
       }
     }
 
-    if (userInv) {
-      const activeInv = userInv.find(inv => !inv.completed_at);
-      const completedInv = userInv.filter(inv => inv.completed_at);
+    if (userInv && userInv.length > 0) {
+      const activeInv = userInv.find((inv: any) => !inv.completed_at);
+      const completedInv = userInv.filter((inv: any) => inv.completed_at);
       
       setActive(activeInv || null);
-      setCompleted(completedInv.map(inv => ({
+      setCompleted(completedInv.map((inv: any) => ({
         ...inv,
         has_revelation: completedWithRevelation.has(inv.investigation_id)
       })));
 
-      const startedIds = userInv.map(inv => inv.investigation_id);
-      setGuidedAvailable(guided?.filter(inv => !startedIds.includes(inv.id)) || []);
-      setCustomAvailable(custom?.filter(inv => !startedIds.includes(inv.id)) || []);
+      const startedIds = userInv.map((inv: any) => inv.investigation_id);
+      console.log("🔍 [FETCH] Started investigation IDs:", startedIds);
+
+      // ============================================================
+      // Always show exactly 3 guided investigations
+      // ============================================================
+      let availableGuided = allGuidedData?.filter((inv: any) => !startedIds.includes(inv.id)) || [];
+      console.log("🔍 [FETCH] Available guided (not started):", availableGuided.length);
+      
+      // If fewer than 3 available, generate new ones (but only if user has enough memories)
+      if (availableGuided.length < 3 && !generating) {
+        console.log("🔍 [FETCH] Less than 3 available, generating more...");
+        setGenerating(true);
+        try {
+          const result = await generateGuidedInvestigations(userId, 3 - availableGuided.length);
+          if (result.success) {
+            console.log("✅ [FETCH] Generated new guided investigations");
+            // Refetch guided data
+            const { data: newGuided, error: newGuidedError } = await supabase
+              .from("investigations")
+              .select("*")
+              .eq("is_active", true)
+              .eq("is_custom", false)
+              .order("created_at");
+            
+            if (!newGuidedError && newGuided) {
+              allGuidedData = newGuided; // ✅ Now works because we used 'let'
+              setAllGuided(newGuided);
+              // Recalculate available
+              availableGuided = newGuided.filter((inv: any) => !startedIds.includes(inv.id));
+              console.log("🔍 [FETCH] After generation, available:", availableGuided.length);
+            }
+          } else {
+            console.warn("⚠️ [FETCH] Generation failed or not enough memories:", result.error);
+          }
+        } catch (err) {
+          console.error("❌ [FETCH] Generation error:", err);
+        } finally {
+          setGenerating(false);
+        }
+      }
+      
+      // Take up to 3 available guided investigations
+      const displayGuided = availableGuided.slice(0, 3);
+      console.log("🔍 [FETCH] Displaying guided:", displayGuided.length);
+      
+      setGuidedAvailable(displayGuided);
+      
+      const filteredCustom = custom?.filter((inv: any) => !startedIds.includes(inv.id)) || [];
+      console.log("🔍 [FETCH] Filtered custom (available):", filteredCustom.length);
+      
+      setCustomAvailable(filteredCustom);
+      
+      if (activeInv) {
+        console.log("✅ [FETCH] Active investigation found:", {
+          id: activeInv.investigation_id,
+          title: activeInv.investigation?.title,
+          progress: activeInv.progress
+        });
+      } else {
+        console.log("ℹ️ [FETCH] No active investigation");
+      }
     } else {
       setActive(null);
       setCompleted([]);
-      setGuidedAvailable(guided || []);
+      // Show first 3 guided investigations (or generate if none)
+      let displayGuided = allGuidedData?.slice(0, 3) || [];
+      if (displayGuided.length < 3 && !generating) {
+        setGenerating(true);
+        try {
+          const result = await generateGuidedInvestigations(userId, 3);
+          if (result.success) {
+            const { data: newGuided, error: newGuidedError } = await supabase
+              .from("investigations")
+              .select("*")
+              .eq("is_active", true)
+              .eq("is_custom", false)
+              .order("created_at");
+            if (!newGuidedError && newGuided) {
+              setAllGuided(newGuided);
+              displayGuided = newGuided.slice(0, 3);
+            }
+          }
+        } catch (err) {
+          console.error("❌ [FETCH] Generation error:", err);
+        } finally {
+          setGenerating(false);
+        }
+      }
+      setGuidedAvailable(displayGuided);
       setCustomAvailable(custom || []);
     }
+    
+    setDebugInfo(`Fetched at ${new Date().toLocaleTimeString()}`);
+    console.log("✅ [FETCH] fetchData complete");
   };
 
   const startInvestigation = async (invId: string) => {
-    if (!user) return;
+    if (!user) {
+      console.error("❌ [START] No user");
+      return;
+    }
+    
+    console.log("🚀 [START] Starting investigation:", invId);
+    console.log("🔑 [START] User ID:", user.id);
+    
+    try {
+      // Check if there's already an active investigation
+      const { data: existing } = await supabase
+        .from("user_investigations")
+        .select("id, investigation_id")
+        .eq("user_id", user.id)
+        .is("completed_at", null)
+        .limit(1);
 
-    const { error } = await supabase.from("user_investigations").insert({
-      user_id: user.id,
-      investigation_id: invId,
-      progress: 0,
-      memories_since_start: 0,
-      signals_collected: {},
-      current_memory_ids: [],
-    });
+      if (existing && existing.length > 0) {
+        console.warn("⚠️ [START] User already has an active investigation:", existing[0]);
+        alert("You already have an active investigation. Please complete it first.");
+        return;
+      }
 
-    if (!error) {
+      const insertData: any = {
+        user_id: user.id,
+        investigation_id: invId,
+        progress: 0,
+        memories_since_start: 0,
+        signals_collected: {},
+      };
+
+      console.log("📝 [START] Insert data:", insertData);
+
+      const { data, error } = await supabase
+        .from("user_investigations")
+        .insert(insertData)
+        .select();
+
+      if (error) {
+        console.error("❌ [START] Insert error:", error);
+        alert(`Failed to start: ${error.message}`);
+        return;
+      }
+
+      console.log("✅ [START] Insert successful:", data);
+      console.log("🔄 [START] Refetching data...");
       await fetchData(user.id);
+      console.log("✅ [START] Refetch complete");
+      
+    } catch (err) {
+      console.error("❌ [START] Unexpected error:", err);
+      alert("Failed to start investigation. Please try again.");
     }
   };
 
@@ -173,6 +354,7 @@ export default function InvestigationsPage() {
   }
 
   const hasActive = active !== null;
+  console.log("🔍 [RENDER] hasActive:", hasActive, "active:", active?.investigation?.title);
 
   return (
     <div className="pb-24 md:pb-6">
@@ -196,8 +378,18 @@ export default function InvestigationsPage() {
             <Plus className="h-4 w-4" />
             Custom
           </Button>
+          <span className="text-xs text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full">
+            {debugInfo}
+          </span>
         </div>
       </div>
+
+      {generating && (
+        <div className="bg-blue-50 rounded-xl p-3 border border-blue-200 text-sm text-blue-700 mb-4 flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+          Generating personalized investigations based on your life...
+        </div>
+      )}
 
       {hasActive && (
         <div className="bg-amber-50 rounded-xl p-3 border border-amber-200 text-sm text-amber-700 mb-4 flex items-center gap-2">
@@ -249,6 +441,9 @@ export default function InvestigationsPage() {
           <h2 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
             Guided Investigations
+            <span className="text-xs text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full ml-auto">
+              {guidedAvailable.length} available
+            </span>
           </h2>
           {guidedAvailable.map((inv) => (
             <motion.div
@@ -278,6 +473,21 @@ export default function InvestigationsPage() {
               </div>
             </motion.div>
           ))}
+        </div>
+      )}
+
+      {guidedAvailable.length === 0 && allGuided.length > 0 && (
+        <div className="bg-secondary/30 rounded-xl p-6 text-center border border-dashed border-secondary">
+          <Sparkles className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">You've completed all guided investigations!</p>
+          <p className="text-xs text-muted-foreground mt-1">Create a custom investigation to continue your journey</p>
+          <Button 
+            onClick={() => router.push("/investigations/new")}
+            className="mt-4"
+            variant="outline"
+          >
+            Create Custom Investigation
+          </Button>
         </div>
       )}
 
