@@ -33,11 +33,14 @@ export function MobileNav() {
               className={cn(
                 "flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all duration-200 relative",
                 isActive
-                  ? "text-primary bg-primary/10"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  ? "text-primary bg-primary/10 scale-105"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50 hover:scale-105"
               )}
             >
-              <item.icon className="h-5 w-5" />
+              <item.icon className={cn(
+                "h-5 w-5 transition-transform duration-200",
+                isActive && "scale-110"
+              )} />
               <span className="text-[10px] font-medium">{item.label}</span>
               {isActive && (
                 <span className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-primary rounded-full" />

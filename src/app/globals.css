@@ -221,3 +221,104 @@ body::before {
   0% { transform: translateX(-100%) skewX(-20deg); }
   100% { transform: translateX(200%) skewX(-20deg); }
 }
+/* ============================================================
+   GLOBAL HOVER ANIMATIONS – Subtle & Consistent
+   ============================================================ */
+
+/* All clickable elements get a subtle transform */
+button, 
+a, 
+[role="button"],
+.cursor-pointer,
+.clickable {
+  @apply transition-all duration-200 ease-out;
+}
+
+/* Primary hover effect: gentle lift + shadow */
+button:hover, 
+a:hover, 
+[role="button"]:hover,
+.cursor-pointer:hover {
+  @apply -translate-y-0.5;
+}
+
+/* Cards with hover lift */
+.hover-lift {
+  @apply transition-all duration-200 ease-out;
+}
+.hover-lift:hover {
+  @apply -translate-y-1 shadow-md;
+}
+
+/* Buttons - subtle scale on hover */
+.btn-hover {
+  @apply transition-all duration-200 ease-out;
+}
+.btn-hover:hover {
+  @apply scale-[1.02] shadow-md;
+}
+.btn-hover:active {
+  @apply scale-[0.98];
+}
+
+/* Icon hover: gentle rotation or scale */
+.icon-hover {
+  @apply transition-all duration-300 ease-out;
+}
+.icon-hover:hover {
+  @apply scale-110 rotate-3;
+}
+
+/* Link hover: underline animation */
+.link-hover {
+  @apply relative transition-colors duration-200;
+}
+.link-hover::after {
+  content: '';
+  @apply absolute bottom-0 left-0 w-0 h-0.5 bg-primary transition-all duration-300 ease-out;
+}
+.link-hover:hover::after {
+  @apply w-full;
+}
+
+/* Card hover: subtle border glow */
+.card-glow {
+  @apply transition-all duration-300 ease-out border border-transparent;
+}
+.card-glow:hover {
+  @apply border-primary/30 shadow-md;
+}
+
+/* Interactive elements: soft color shift */
+.interactive {
+  @apply transition-colors duration-200 ease-out;
+}
+.interactive:hover {
+  @apply text-primary;
+}
+
+/* Navigation items: subtle background shift */
+.nav-hover {
+  @apply transition-all duration-200 ease-out;
+}
+.nav-hover:hover {
+  @apply bg-primary/10 scale-105;
+}
+
+/* Slow float animation for discovery cards */
+.float-slow {
+  animation: floatSlow 3s ease-in-out infinite;
+}
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+/* Pulse glow for important elements */
+.pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+}

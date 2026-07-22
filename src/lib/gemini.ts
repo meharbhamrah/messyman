@@ -1,23 +1,51 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash-lite";
+const apiKey = process.env.GEMINI_API_KEY || "";
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.1-flash-lite";
+
+console.log("🔧 [GEMINI] Initialized with model:", MODEL);
+console.log("🔧 [GEMINI] API Key exists:", !!apiKey);
+
+const genAI = new GoogleGenerativeAI(apiKey);
 
 // ============================================================
-// CORE EXTRACTIONS (unchanged)
+// HELPER: Try models with fallback
+// ============================================================
+
+async function tryModels(prompt: any, modelNames: string[] = [MODEL, "gemini-1.5-flash", "gemini-pro"]): Promise<any> {
+  let lastError = null;
+  
+  for (const modelName of modelNames) {
+    try {
+      console.log(`📦 [GEMINI] Trying model: ${modelName}`);
+      const model = genAI.getGenerativeModel({ model: modelName });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      console.log(`✅ [GEMINI] Success with ${modelName}`);
+      return response;
+    } catch (error: any) {
+      console.warn(`⚠️ [GEMINI] ${modelName} failed:`, error.message);
+      if (error.status) console.warn(`   Status: ${error.status}`);
+      lastError = error;
+    }
+  }
+  
+  throw lastError || new Error("All models failed");
+}
+
+// ============================================================
+// CORE EXTRACTIONS
 // ============================================================
 
 export async function extractMemoryData(text: string) {
   console.log("📝 [TEXT] Analyzing...");
-  const model = genAI.getGenerativeModel({ model: MODEL });
   const prompt = `
 Analyze the following personal journal entry. Extract structured information in JSON format.
 Entry: "${text}"
 Return ONLY valid JSON with: summary, emotions (array), topics (array), people (array), activities (array), places (array), keywords (array), sentiment (number -1 to 1).
 `;
   try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
+    const response = await tryModels(prompt);
     const clean = response.text().replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     return JSON.parse(clean);
   } catch (e) { 
@@ -37,11 +65,14 @@ export async function analyzePhoto(imageUrl: string) {
     const buffer = await response.arrayBuffer();
     const base64 = Buffer.from(buffer).toString('base64');
     const mimeType = response.headers.get('content-type') || 'image/jpeg';
-    const model = genAI.getGenerativeModel({ model: MODEL });
-    const result = await model.generateContent([
+    
+    const prompt = [
       "Analyze this photo. Return ONLY valid JSON: { \"mood\": \"happy/sad/calm/excited/peaceful\", \"objects\": [\"object1\", \"object2\"], \"people_count\": 0, \"scene\": \"indoor/outdoor/nature/urban\", \"activity\": \"what's happening\", \"vibe\": \"peaceful/energetic\", \"sentiment\": 0.5 }",
       { inlineData: { mimeType: mimeType, data: base64 } }
-    ]);
+    ];
+    
+    const model = genAI.getGenerativeModel({ model: MODEL });
+    const result = await model.generateContent(prompt);
     const text = await result.response.text();
     const clean = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     return JSON.parse(clean);
@@ -53,15 +84,13 @@ export async function analyzePhoto(imageUrl: string) {
 
 export async function analyzeMusic(songTitle: string, artist: string) {
   console.log("🎵 [MUSIC] Analyzing...");
-  const model = genAI.getGenerativeModel({ model: MODEL });
   const prompt = `
 Analyze this song: "${songTitle}" by "${artist || 'Unknown'}"
 Return ONLY valid JSON: { "genre": "genre", "mood": "happy/melancholic/energetic/calm", "tempo": "slow/medium/fast", "energy": "low/medium/high", "vibe": "overall vibe" }
 `;
   try {
-    const result = await model.generateContent(prompt);
-    const text = await result.response.text();
-    const clean = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const response = await tryModels(prompt);
+    const clean = response.text().replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     return JSON.parse(clean);
   } catch (e) {
     console.error("❌ [MUSIC] Error:", e);
@@ -71,15 +100,13 @@ Return ONLY valid JSON: { "genre": "genre", "mood": "happy/melancholic/energetic
 
 export async function analyzeLocation(locationName: string) {
   console.log("📍 [LOCATION] Analyzing...");
-  const model = genAI.getGenerativeModel({ model: MODEL });
   const prompt = `
 Analyze this location: "${locationName}"
 Return ONLY valid JSON: { "type": "city/park/cafe/home/work/nature/other", "vibe": "urban/peaceful/natural/social", "category": "residential/commercial/natural", "sentiment": 0.0 }
 `;
   try {
-    const result = await model.generateContent(prompt);
-    const text = await result.response.text();
-    const clean = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const response = await tryModels(prompt);
+    const clean = response.text().replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     return JSON.parse(clean);
   } catch (e) {
     console.error("❌ [LOCATION] Error:", e);
@@ -88,76 +115,33 @@ Return ONLY valid JSON: { "type": "city/park/cafe/home/work/nature/other", "vibe
 }
 
 // ============================================================
-// JOURNAL PROMPT – Balanced & Writable
+// JOURNAL PROMPT
 // ============================================================
 
 export async function generateJournalPrompt(history: string, question?: string) {
-  console.log("📝 [PROMPT] Generating balanced prompt...");
-  
-  // For new users with no history
+  console.log("📝 [PROMPT] Generating...");
   if (!history || history.length < 20) {
     const starters = [
-      "What's on your mind today?",
-      "What's a feeling you've been carrying with you?",
-      "What would you like to remember about today?",
-      "What's a small moment that made you pause?",
-      "What are you grateful for today?",
+      "What's something you've been thinking about lately?",
+      "How are you feeling today, really?",
+      "What's a small moment that made you smile recently?",
     ];
     return starters[Math.floor(Math.random() * starters.length)];
   }
-  
-  const model = genAI.getGenerativeModel({ model: MODEL });
-  
-  // Extract themes from history
   const themes = extractThemesFromHistory(history);
-  const topThemes = themes.split(", ").slice(0, 3);
-  
-  // Build a balanced prompt
-  const prompt = `
-You are a thoughtful friend inviting someone to reflect. Based on themes from their life: "${themes}", generate ONE warm, inviting journal prompt.
-
-The prompt should:
-- Feel personal and relevant (relate to the themes)
-- Be open and easy to write about (not too specific)
-- Sound like a friend asking, not a therapist
-- Be 1 sentence, short and simple
-- Use everyday language
-
-${question ? `They're exploring: "${question}" – the prompt can gently relate to this.` : ''}
-
-Examples of good prompts:
-- "What's something you've been thinking about a lot lately?"
-- "What's a moment today that felt meaningful?"
-- "What's a feeling you've been carrying with you?"
-
-Return ONLY the prompt text. No explanations. No quotes. Just the prompt.`;
-
+  const prompt = `You're a thoughtful friend inviting someone to reflect. Based on themes from their life: "${themes}", generate ONE warm, inviting journal prompt. The prompt should feel personal and relevant, be open and easy to write about, and sound like a friend asking. ${question ? `They're exploring: "${question}" – the prompt can gently relate to this.` : ''} Return ONLY the prompt text.`;
   try {
-    const result = await model.generateContent(prompt);
-    const text = await result.response.text();
-    const clean = text.replace(/["']/g, '').trim();
-    console.log("✅ [PROMPT] Generated:", clean);
-    return clean;
+    const response = await tryModels(prompt);
+    return response.text().replace(/["']/g, '').trim();
   } catch (e) { 
     console.error("❌ [PROMPT] Error:", e); 
-    return getFallbackPrompt(topThemes);
+    const templates = [
+      `What's something you've been learning about ${themes.split(',')[0] || 'life'} lately?`,
+      `When you think about ${themes.split(',')[0] || 'life'}, what comes to mind?`,
+      `What's a moment recently that made you think about ${themes.split(',')[0] || 'life'}?`,
+    ];
+    return templates[Math.floor(Math.random() * templates.length)];
   }
-}
-
-function getFallbackPrompt(themes: string[]): string {
-  const theme = themes[0] || 'life';
-  
-  const fallbacks = [
-    `What's something you've been thinking about ${theme} lately?`,
-    `When you think about ${theme}, what comes to mind?`,
-    `What's a feeling that's been coming up for you lately?`,
-    `What's a moment today that made you pause?`,
-    `What's something you're grateful for today?`,
-    `What's a question you've been asking yourself?`,
-    `What's a small moment that felt meaningful?`,
-    `What would you tell a friend who felt what you're feeling?`,
-  ];
-  return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 }
 
 function extractThemesFromHistory(history: string): string {
@@ -196,11 +180,9 @@ export async function generateDailyDiscovery(userData: any) {
 // ============================================================
 
 export async function generateStructuredDiscovery(userData: any): Promise<any> {
-  console.log("🔍 [DISCOVERY] Generating structured insight with model:", MODEL);
+  console.log("🔍 [DISCOVERY] Generating structured insight...");
   const memories = userData.memories || [];
   if (memories.length < 3) return null;
-  
-  const model = genAI.getGenerativeModel({ model: MODEL });
   
   const angles = [
     "time patterns",
@@ -254,9 +236,8 @@ Return ONLY the JSON object.
 `;
 
   try {
-    const result = await model.generateContent(prompt);
-    const text = await result.response.text();
-    const clean = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const response = await tryModels(prompt);
+    const clean = response.text().replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     const parsed = JSON.parse(clean);
     console.log("✅ [DISCOVERY] Structured insight:", parsed);
     return parsed;
@@ -456,17 +437,238 @@ function detectHabits(memories: any[]) {
 }
 
 // ============================================================
+// AI-POWERED RELEVANCE
+// ============================================================
+
+export async function calculateRelevanceWithAI(
+  memory: any,
+  investigationQuestion: string,
+  investigationTitle: string
+): Promise<number> {
+  console.log("🤖 [RELEVANCE] Using AI to calculate relevance...");
+  console.log("🤖 [RELEVANCE] Question:", investigationQuestion);
+  console.log("🤖 [RELEVANCE] Title:", investigationTitle);
+  
+  const memoryData = {
+    text: memory.text || '',
+    summary: memory.ai_summary || '',
+    emotions: memory.ai_emotions || [],
+    topics: memory.ai_topics || [],
+    people: memory.ai_people || [],
+    activities: memory.ai_activities || [],
+    places: memory.ai_places || [],
+    keywords: memory.ai_keywords || [],
+    sentiment: memory.ai_sentiment || 0,
+  };
+  
+  const prompt = `
+You are a relevance analyzer for a personal journal app.
+
+**Investigation:** "${investigationTitle}"
+**Question:** "${investigationQuestion}"
+
+**Memory:**
+- Text: "${memoryData.text}"
+- Summary: "${memoryData.summary}"
+- Emotions: ${memoryData.emotions.join(', ')}
+- Topics: ${memoryData.topics.join(', ')}
+- People: ${memoryData.people.join(', ')}
+- Activities: ${memoryData.activities.join(', ')}
+- Places: ${memoryData.places.join(', ')}
+- Keywords: ${memoryData.keywords.join(', ')}
+
+**Task:** Rate how relevant this memory is to the investigation on a scale of 0 to 1.
+- 0 = completely irrelevant
+- 0.3 = somewhat relevant (mentions related topics but not directly)
+- 0.6 = moderately relevant (directly related to the investigation)
+- 1.0 = highly relevant (directly answers or provides key evidence)
+
+Return ONLY a number between 0 and 1. No other text.
+`;
+
+  try {
+    const response = await tryModels(prompt);
+    const text = response.text();
+    const score = parseFloat(text.trim());
+    console.log("🤖 [RELEVANCE] AI score:", score);
+    return Math.max(0, Math.min(1, score));
+  } catch (e) {
+    console.error("❌ [RELEVANCE] AI failed, using keyword fallback:", e);
+    return calculateRelevanceWithKeywords(memory, investigationQuestion);
+  }
+}
+
+// ============================================================
+// FALLBACK: Keyword-Based Relevance
+// ============================================================
+
+export function calculateRelevanceWithKeywords(
+  memory: any,
+  investigationQuestion: string
+): number {
+  console.log("📊 [RELEVANCE] Using keyword fallback...");
+  
+  const topics = memory.ai_topics || [];
+  const emotions = memory.ai_emotions || [];
+  const people = memory.ai_people || [];
+  const keywords = memory.ai_keywords || [];
+  const text = (memory.text || "").toLowerCase();
+  const summary = (memory.ai_summary || "").toLowerCase();
+  
+  const questionWords = investigationQuestion.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+  
+  let score = 0;
+  
+  const matchingTopics = topics.filter((t: string) => 
+    questionWords.some(qw => t.toLowerCase().includes(qw))
+  );
+  if (matchingTopics.length > 0) score += 0.3;
+  
+  const textMatches = questionWords.filter(qw => text.includes(qw) || summary.includes(qw));
+  if (textMatches.length > 2) score += 0.2;
+  else if (textMatches.length > 0) score += 0.1;
+  
+  if (people && people.length > 0) score += 0.2;
+  
+  if (emotions && emotions.length > 0) score += 0.15;
+  
+  const keywordMatches = keywords.filter((k: string) => 
+    questionWords.some(qw => k.toLowerCase().includes(qw))
+  );
+  if (keywordMatches.length > 0) score += 0.15;
+  
+  console.log("📊 [RELEVANCE] Keyword score:", Math.min(score, 1.0));
+  return Math.min(score, 1.0);
+}
+
+// ============================================================
+// GENERATE INVESTIGATION SUGGESTIONS – Open-ended & Balanced
+// ============================================================
+
+export async function generateInvestigationSuggestions(userData: any): Promise<string[]> {
+  console.log("🤖 [SUGGESTIONS] Generating investigation suggestions...");
+  console.log("🤖 [SUGGESTIONS] Model:", MODEL);
+  console.log("🤖 [SUGGESTIONS] API Key exists:", !!apiKey);
+  
+  if (!apiKey) {
+    console.error("❌ [SUGGESTIONS] No API key found!");
+    return [];
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: MODEL });
+    console.log("🤖 [SUGGESTIONS] Model created successfully");
+    
+    const memories = userData.memories || [];
+    const memoryTexts = memories.slice(0, 10).map((m: any) => 
+      `"${m.text || m.ai_summary || ''}"`
+    ).join('\n');
+    
+    console.log("🤖 [SUGGESTIONS] Number of memories:", memories.length);
+    console.log("🤖 [SUGGESTIONS] Memory texts length:", memoryTexts.length);
+    
+    const prompt = `
+Based on this person's journal entries, suggest 5 broad, open-ended investigation questions they might want to explore about themselves.
+
+Their recent entries:
+${memoryTexts}
+
+The questions should:
+- Be broad and open-ended (not too specific)
+- Help them discover patterns about their life
+- Be reflective and personal
+- Cover different life areas (emotions, relationships, work, growth, well-being)
+- Feel like a friend asking a thoughtful question
+
+**Examples of good questions:**
+- "What truly makes me feel fulfilled?"
+- "How do I handle change and uncertainty?"
+- "What patterns shape my relationships?"
+- "What gives me a sense of purpose?"
+- "How do I respond to stress and challenge?"
+
+**Examples of bad questions (too specific):**
+- "Why did my ex and I break up?"
+- "How do I cope with my boss's criticism?"
+- "What should I do about my anxiety at work?"
+
+Return ONLY an array of 5 strings. No explanations. No additional text.
+`;
+
+    console.log("🤖 [SUGGESTIONS] Sending to Gemini...");
+    const result = await model.generateContent(prompt);
+    console.log("🤖 [SUGGESTIONS] Received response from Gemini");
+    
+    const text = await result.response.text();
+    console.log("🤖 [SUGGESTIONS] Raw response:", text.substring(0, 200) + "...");
+    
+    const clean = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+    const suggestions = JSON.parse(clean);
+    
+    console.log("✅ [SUGGESTIONS] Generated", suggestions.length, "suggestions");
+    return Array.isArray(suggestions) ? suggestions.slice(0, 5) : [];
+  } catch (error: any) {
+    console.error("❌ [SUGGESTIONS] Error:", error);
+    console.error("❌ [SUGGESTIONS] Status:", error.status);
+    console.error("❌ [SUGGESTIONS] Message:", error.message);
+    if (error.errorDetails) {
+      console.error("❌ [SUGGESTIONS] Details:", JSON.stringify(error.errorDetails, null, 2));
+    }
+    return [];
+  }
+}
+
+// ============================================================
 // REVELATION REPORT
 // ============================================================
 
 export async function generateRevelationReport(userData: any, question: string) {
-  console.log("📊 [REVELATION] Generating...");
-  const model = genAI.getGenerativeModel({ model: MODEL });
+  console.log("📊 [REVELATION] Generating report...");
+  
+  const memories = userData.memories || [];
+  const memoryTexts = memories.map((m: any) => 
+    `Memory: "${m.text || m.ai_summary || ''}"\nEmotions: ${m.ai_emotions?.join(', ') || 'None'}\nTopics: ${m.ai_topics?.join(', ') || 'None'}\nPeople: ${m.ai_people?.join(', ') || 'None'}\nSentiment: ${m.ai_sentiment || 0}`
+  ).join('\n---\n');
+
   const prompt = `
-You're creating a personal revelation report for someone who just completed a self-discovery journey. The report should feel like a celebration of who they are, be surprising and specific, sound warm and personal, include specific patterns from their data, and be encouraging and meaningful. Question they explored: "${question || 'What makes them who they are?'}". Data: ${JSON.stringify(userData)}. Return a JSON object with: { "title": "A catchy, personal title", "summary": "A warm, surprising summary", "sections": [ { "heading": "A surprising heading", "content": "Warm, personal content" } ], "key_takeaway": "The most surprising, meaningful thing they should know about themselves" }`;
+You are creating a personal revelation report for someone who just completed a self-discovery investigation.
+
+**Investigation Question:** "${question}"
+
+**Their memories:**
+${memoryTexts}
+
+**Your task:** Create a surprising, personal, and human report. This should feel like a friend sharing observations they've noticed about you, not a robot analyzing data.
+
+**Rules:**
+1. Write directly to the person (use "you")
+2. Find patterns they wouldn't notice themselves – especially CONTRADICTIONS and SURPRISING patterns
+3. Be specific – reference actual details from their memories
+4. Sound warm and human, like a close friend
+5. Make it surprising
+
+**The report structure:**
+- Title: A catchy, personal title (3-5 words)
+- Summary: One surprising observation
+- 3 sections with headings and content
+- Key takeaway: The most meaningful thing they should know
+
+Return a JSON object with:
+{
+  "title": "catchy personal title",
+  "summary": "one surprising observation",
+  "sections": [
+    { "heading": "surprising heading", "content": "specific, personal content" },
+    { "heading": "another surprising heading", "content": "more specific content" },
+    { "heading": "the most surprising heading", "content": "the wow moment" }
+  ],
+  "key_takeaway": "the most meaningful thing they should know"
+}
+`;
+
   try {
-    const result = await model.generateContent(prompt);
-    const text = await result.response.text();
+    const response = await tryModels(prompt);
+    const text = response.text();
     const clean = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
     console.log("✅ [REVELATION] Generated");
     return JSON.parse(clean);
