@@ -1,12 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Critical: force absolute URLs for all assets
   assetPrefix: process.env.NEXT_PUBLIC_APP_URL || '',
-  
   trailingSlash: false,
-  
-  // Updated: use remotePatterns instead of deprecated domains
   images: {
     remotePatterns: [
       {
@@ -32,18 +28,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  
-  // Ignore TypeScript errors during build (for testing)
   typescript: {
     ignoreBuildErrors: true,
   },
-  
-  // Ignore ESLint errors during build
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  
-  // Turbopack config (empty object to silence the warning)
   turbopack: {},
 };
 
