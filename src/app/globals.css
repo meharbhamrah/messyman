@@ -329,3 +329,9 @@ a:hover,
     padding-bottom: max(env(safe-area-inset-bottom), 0px);
   }
 }
+
+@supports (padding: max(0px)) {
+  .md\:hidden.fixed.bottom-0 {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
+}
