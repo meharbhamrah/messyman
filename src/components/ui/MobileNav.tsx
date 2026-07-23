@@ -22,9 +22,8 @@ export function MobileNav() {
   }
 
   return (
-    // ✅ Added z-50 and pointer-events-auto to ensure it's clickable
-    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-border/50 shadow-soft z-50 pointer-events-auto">
-      <nav className="flex items-center justify-around px-2 py-2 max-w-7xl mx-auto">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 border-t border-primary/10 shadow-lg z-50 safe-bottom">
+      <nav className="flex items-center justify-around px-1 py-1 max-w-7xl mx-auto">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           return (
@@ -32,17 +31,19 @@ export function MobileNav() {
               key={item.label}
               onClick={() => router.push(item.href)}
               className={cn(
-                "flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all duration-200 relative",
+                "flex flex-col items-center justify-center gap-0.5 px-2 py-1.5 rounded-xl transition-colors duration-150 touch-manipulation",
+                "min-h-[44px] min-w-[44px]", // Larger touch targets
                 isActive
-                  ? "text-primary bg-primary/10 scale-105"
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50 hover:scale-105"
+                  ? "text-primary bg-primary/10"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
               )}
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               <item.icon className={cn(
-                "h-5 w-5 transition-transform duration-200",
-                isActive && "scale-110"
+                "h-5 w-5 transition-none",
+                isActive && "scale-105"
               )} />
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <span className="text-[10px] font-medium leading-none">{item.label}</span>
               {isActive && (
                 <span className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-primary rounded-full" />
               )}
