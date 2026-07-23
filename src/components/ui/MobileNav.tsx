@@ -22,7 +22,8 @@ export function MobileNav() {
   }
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-border/50 shadow-soft">
+    // ✅ Added z-50 and pointer-events-auto to ensure it's clickable
+    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t border-border/50 shadow-soft z-50 pointer-events-auto">
       <nav className="flex items-center justify-around px-2 py-2 max-w-7xl mx-auto">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
