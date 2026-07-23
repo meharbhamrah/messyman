@@ -322,3 +322,10 @@ a:hover,
   0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
   50% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
 }
+
+/* Safe area for modern iPhones */
+@supports (padding: max(0px)) {
+  .fixed.bottom-0 {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
+}

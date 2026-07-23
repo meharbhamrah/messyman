@@ -22,7 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body className="min-h-screen font-sans antialiased relative">
-        <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-6">
+        <div className="relative z-10 w-full px-4 sm:px-6 lg:px-8 py-6 pb-16 md:pb-6">
           {children}
         </div>
         <MobileNav />
